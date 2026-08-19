@@ -12,6 +12,26 @@ const io = new Server(server);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
+const fs = require('fs');
+const USERS_FILE = path.join(__dirname, 'users.json');
+
+// Veritabanı Yardımcı Fonksiyonları
+function loadUsers() {
+    if (!fs.existsSync(USERS_FILE)) {
+        fs.writeFileSync(USERS_FILE, JSON.stringify({}));
+        return {};
+    }
+    try {
+        return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveUsers(users) {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
 // JSON Fetch Helper
 function fetchJson(url) {
     return new Promise((resolve, reject) => {
@@ -123,7 +143,17 @@ io.on('connection', (socket) => {
 
         // Oda verisi yoksa başlat
         if (!roomsData[roomId]) {
-            roomsData[roomId] = { url: '', time: 0, isPlaying: false, title: '', users: {}, chatHistory: [], admin: null };
+            roomsData[roomId] = { 
+                url: '', 
+                mediaType: 'vidsrc', // vidsrc, youtube, instagram
+                time: 0, 
+                isPlaying: false, 
+                title: '', 
+                users: {}, 
+                chatHistory: [], 
+                queue: [], // Medya kuyruğu
+                admin: null 
+            };
         }
 
         // İlk giren kişi veya admin yoksa admin yap
@@ -153,21 +183,42 @@ io.on('connection', (socket) => {
     // Film kaynağı değiştiğinde (Oda bazlı)
     socket.on('changeVideo', (data) => {
         if (!currentRoom) return;
-        // YALNIZCA ADMİN DEĞİŞTİREBİLİR
         if (roomsData[currentRoom].admin !== socket.id) return;
 
         console.log(`[Socket] ${currentRoom} odasında ${socket.username} video değiştirdi: ${data.url}`);
         roomsData[currentRoom] = { 
-            ...roomsData[currentRoom], // Önceki verileri (users, chat, admin) koru
-            url: data.url, 
+            ...roomsData[currentRoom],
+            url: data.url,
+            mediaType: data.mediaType || 'vidsrc',
             time: 0, 
             isPlaying: false, 
             title: data.title 
         };
         io.to(currentRoom).emit('updateVideo', roomsData[currentRoom]);
-        
-        // Video değiştiğinde sistem mesajı gönder
         io.to(currentRoom).emit('systemMessage', `${socket.username} ${data.title} açtı.`);
+    });
+
+    // Kuyruktan Sonrakine Geç
+    socket.on('playNext', () => {
+        if (!currentRoom) return;
+        if (roomsData[currentRoom].admin !== socket.id) return;
+        
+        if (roomsData[currentRoom].queue.length > 0) {
+            const nextMedia = roomsData[currentRoom].queue.shift();
+            
+            roomsData[currentRoom] = { 
+                ...roomsData[currentRoom],
+                url: nextMedia.url,
+                mediaType: nextMedia.type,
+                time: 0, 
+                isPlaying: false, 
+                title: nextMedia.title 
+            };
+            
+            io.to(currentRoom).emit('updateVideo', roomsData[currentRoom]);
+            io.to(currentRoom).emit('queueUpdated', roomsData[currentRoom].queue);
+            io.to(currentRoom).emit('systemMessage', `${socket.username} kuyruktaki sıradaki videoya geçti: ${nextMedia.title}`);
+        }
     });
 
     // Geri Sayım Olayı
@@ -206,7 +257,6 @@ io.on('connection', (socket) => {
     socket.on('chatMessage', (msg) => {
         if (!currentRoom) return;
         
-        // Zaman bilgisi oluştur (HH:MM)
         const now = new Date();
         const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
         
@@ -217,22 +267,94 @@ io.on('connection', (socket) => {
             color: socket.color
         };
 
-        // Mesajı geçmişe ekle (En fazla 50 mesaj tutulur)
         if (!roomsData[currentRoom].chatHistory) roomsData[currentRoom].chatHistory = [];
         roomsData[currentRoom].chatHistory.push(messageData);
         if (roomsData[currentRoom].chatHistory.length > 50) {
             roomsData[currentRoom].chatHistory.shift();
         }
 
-        // Mesajı odadaki herkese (gönderen dahil) ilet
         io.to(currentRoom).emit('chatMessage', messageData);
+
+        // --- Link Algılama (YouTube, Instagram vs.) ---
+        const ytMatch = msg.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+        const instaMatch = msg.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/i);
+
+        if (ytMatch || instaMatch) {
+            let mediaObj = null;
+            if (ytMatch) {
+                mediaObj = {
+                    title: `YouTube Videosu`,
+                    url: `https://www.youtube.com/embed/${ytMatch[1]}`,
+                    type: 'youtube',
+                    addedBy: socket.username
+                };
+            } else if (instaMatch) {
+                mediaObj = {
+                    title: `Instagram Postu`,
+                    url: `https://www.instagram.com/p/${instaMatch[1]}/embed/`,
+                    type: 'instagram',
+                    addedBy: socket.username
+                };
+            }
+
+            if (mediaObj) {
+                roomsData[currentRoom].queue.push(mediaObj);
+                io.to(currentRoom).emit('queueUpdated', roomsData[currentRoom].queue);
+                io.to(currentRoom).emit('systemMessage', `${socket.username} kuyruğa bir video ekledi.`);
+            }
+        }
     });
 
     // "Yazıyor..." Animasyonu İçin
     socket.on('typing', (isTyping) => {
         if (!currentRoom) return;
-        // Odaya, bu kişinin yazıp yazmadığını ilet (Kendisi hariç)
         socket.to(currentRoom).emit('typing', { username: socket.username, isTyping });
+    });
+
+    // Hesap (Auth) Sistemi
+    socket.on('auth', (data) => {
+        const { username, password, type } = data;
+        const users = loadUsers();
+        
+        if (type === 'register') {
+            if (users[username]) {
+                return socket.emit('authResult', { success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
+            }
+            users[username] = { password };
+            saveUsers(users);
+            socket.emit('authResult', { success: true, username });
+        } else if (type === 'login') {
+            if (!users[username] || users[username].password !== password) {
+                return socket.emit('authResult', { success: false, message: 'Hatalı şifre veya kullanıcı adı!' });
+            }
+            socket.emit('authResult', { success: true, username });
+        }
+    });
+
+    // Admin Yetki Devri
+    socket.on('transferAdmin', (targetSocketId) => {
+        if (!currentRoom || roomsData[currentRoom].admin !== socket.id) return;
+        if (roomsData[currentRoom].users[targetSocketId]) {
+            roomsData[currentRoom].admin = targetSocketId;
+            const newAdminName = roomsData[currentRoom].users[targetSocketId].username;
+            io.to(currentRoom).emit('systemMessage', `${newAdminName} odanın yeni yöneticisi oldu! 👑`);
+            io.to(currentRoom).emit('updateUsersList', {
+                users: Object.values(roomsData[currentRoom].users),
+                adminId: roomsData[currentRoom].admin
+            });
+        }
+    });
+
+    // Kullanıcıyı Odadan Atma (Kick)
+    socket.on('kickUser', (targetSocketId) => {
+        if (!currentRoom || roomsData[currentRoom].admin !== socket.id) return;
+        if (targetSocketId === socket.id) return; // Kendini atamaz
+        
+        const targetSocket = io.sockets.sockets.get(targetSocketId);
+        if (targetSocket) {
+            targetSocket.emit('kicked');
+            targetSocket.disconnect(true);
+        }
     });
 
     socket.on('disconnect', () => {
