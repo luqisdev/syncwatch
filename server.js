@@ -32,6 +32,32 @@ function saveUsers(users) {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
+// MongoDB Entegrasyonu
+const mongoose = require('mongoose');
+const MONGODB_URI = process.env.MONGODB_URI;
+let useMongo = false;
+
+if (MONGODB_URI) {
+    mongoose.connect(MONGODB_URI)
+        .then(() => {
+            console.log("[MongoDB] Atlas veritabanına başarıyla bağlandı!");
+            useMongo = true;
+        })
+        .catch(err => {
+            console.error("[MongoDB] Bağlantı hatası:", err.message);
+            console.log("[Fallback] Yerel JSON veritabanı kullanılacak.");
+        });
+} else {
+    console.log("[MongoDB] MONGODB_URI tanımlanmamış. Yerel JSON veritabanı aktif.");
+}
+
+// Mongoose User Şeması
+const UserSchema = new mongoose.Schema({
+    username: { type: String, unique: true, required: true },
+    password: { type: String, required: true }
+});
+const User = mongoose.models.User || mongoose.model('User', UserSchema);
+
 // JSON Fetch Helper
 function fetchJson(url) {
     return new Promise((resolve, reject) => {
@@ -312,22 +338,46 @@ io.on('connection', (socket) => {
     });
 
     // Hesap (Auth) Sistemi
-    socket.on('auth', (data) => {
+    socket.on('auth', async (data) => {
         const { username, password, type } = data;
-        const users = loadUsers();
-        
-        if (type === 'register') {
-            if (users[username]) {
-                return socket.emit('authResult', { success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
+
+        if (useMongo) {
+            try {
+                if (type === 'register') {
+                    const existing = await User.findOne({ username });
+                    if (existing) {
+                        return socket.emit('authResult', { success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
+                    }
+                    const newUser = new User({ username, password });
+                    await newUser.save();
+                    socket.emit('authResult', { success: true, username });
+                } else if (type === 'login') {
+                    const user = await User.findOne({ username });
+                    if (!user || user.password !== password) {
+                        return socket.emit('authResult', { success: false, message: 'Hatalı şifre veya kullanıcı adı!' });
+                    }
+                    socket.emit('authResult', { success: true, username });
+                }
+            } catch (err) {
+                console.error("[Auth] Mongo Hatası:", err.message);
+                socket.emit('authResult', { success: false, message: 'Veritabanı bağlantı hatası oluştu!' });
             }
-            users[username] = { password };
-            saveUsers(users);
-            socket.emit('authResult', { success: true, username });
-        } else if (type === 'login') {
-            if (!users[username] || users[username].password !== password) {
-                return socket.emit('authResult', { success: false, message: 'Hatalı şifre veya kullanıcı adı!' });
+        } else {
+            // Yerel JSON veritabanına fallback
+            const users = loadUsers();
+            if (type === 'register') {
+                if (users[username]) {
+                    return socket.emit('authResult', { success: false, message: 'Bu kullanıcı adı zaten alınmış!' });
+                }
+                users[username] = { password };
+                saveUsers(users);
+                socket.emit('authResult', { success: true, username });
+            } else if (type === 'login') {
+                if (!users[username] || users[username].password !== password) {
+                    return socket.emit('authResult', { success: false, message: 'Hatalı şifre veya kullanıcı adı!' });
+                }
+                socket.emit('authResult', { success: true, username });
             }
-            socket.emit('authResult', { success: true, username });
         }
     });
 
