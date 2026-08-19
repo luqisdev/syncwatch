@@ -180,7 +180,7 @@
 
                     <!-- Instagram Maskeleme Overlay Katmanları -->
                     <div id="instaHeaderOverlay" class="absolute top-0 left-0 right-0 h-[56px] bg-black z-20 pointer-events-none hidden"></div>
-                    <div id="instaFooterOverlay" class="absolute bottom-0 left-0 right-0 h-[125px] bg-black z-20 pointer-events-none hidden"></div>
+                    <div id="instaFooterOverlay" class="absolute bottom-0 left-0 right-0 h-[75px] bg-black z-20 pointer-events-none hidden"></div>
 
                     <div id="placeholder" class="flex flex-col items-center justify-center text-gray-700 h-full">
                         <i class="fas fa-film text-6xl mb-4 opacity-50"></i>
@@ -740,9 +740,9 @@
 
                 // Instagram moduna göre iframe ve container boyutlarını ayarla
                 if (data.mediaType === 'instagram') {
-                    // Maskeleri gizle (sabit boyut kırpması kullandığımız için ihtiyaç kalmadı)
-                    instaHeaderOverlay.classList.add('hidden');
-                    instaFooterOverlay.classList.add('hidden');
+                    // Maskeleri göster (Beyaz 'Daha fazlasını gör' alanını tamamen kapatmak için)
+                    instaHeaderOverlay.classList.remove('hidden');
+                    instaFooterOverlay.classList.remove('hidden');
 
                     // Sabit telefon boyutuna sabitle (kesin kırpma sağlamak için)
                     playerContainer.style.width = '340px';
@@ -755,6 +755,7 @@
                     moviePlayer.style.setProperty('height', '590px', 'important');
                     moviePlayer.style.setProperty('width', '340px', 'important');
                 } else {
+                    // Maskeleri gizle
                     instaHeaderOverlay.classList.add('hidden');
                     instaFooterOverlay.classList.add('hidden');
 
