@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncWatch - Birlikte İzle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .backdrop-blur-md { backdrop-filter: blur(12px); }
+        
+        /* Geri Sayım Animasyonu */
+        @keyframes pulse-scale {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+        .countdown-text {
+            animation: pulse-scale 1s ease-in-out infinite;
+        }
+
+        /* Özel Scrollbar Chat için */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-[#0f0f0f] text-white font-sans min-h-screen flex flex-col items-center">
+    
+    <!-- ODA GİRİŞ EKRANI -->
+    <div id="roomModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-md">
+        <div class="bg-[#1a1a1a] border border-gray-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+            <h1 class="text-3xl font-black text-red-600 mb-2 tracking-tighter">SYNC<span class="text-white">WATCH</span></h1>
+            <p class="text-gray-400 mb-6 text-sm">Arkadaşınızla dizi ve film keyfi için giriş yapın.</p>
+            
+            <div class="text-left mb-4">
+                <label class="block text-gray-400 text-xs font-bold mb-1 ml-1 uppercase">Kullanıcı Adı</label>
+                <input type="text" id="usernameInput" placeholder="Örn: Ahmet" 
+                    class="w-full bg-[#0f0f0f] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all font-bold">
+            </div>
+
+            <div class="text-left mb-6">
+                <label class="block text-gray-400 text-xs font-bold mb-1 ml-1 uppercase">Oda Kodu</label>
+                <input type="text" id="roomInput" placeholder="Örn: gizlioda123" 
+                    class="w-full bg-[#0f0f0f] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all font-bold">
+            </div>
+
+            <button id="joinRoomBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                <i class="fas fa-door-open"></i> Odaya Katıl
+            </button>
+        </div>
+    </div>
+
+    <!-- GERİ SAYIM EKRANI (OVERLAY) -->
+    <div id="countdownOverlay" class="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] hidden backdrop-blur-lg">
+        <div class="text-center">
+            <h1 id="countdownNumber" class="text-9xl font-black text-red-600 mb-4 tracking-tighter drop-shadow-[0_0_30px_rgba(220,38,38,0.8)]">3</h1>
+            <p id="countdownMessage" class="text-2xl font-bold text-white uppercase tracking-widest hidden">Oynat Tuşuna Bas!</p>
+        </div>
+    </div>
+
+    <!-- ANA ARAYÜZ (Başlangıçta Gizli) -->
+    <div id="mainUI" class="w-full max-w-7xl p-4 flex-1 flex flex-col hidden">
+        <!-- Header & Room Info -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-6 bg-[#1a1a1a] p-4 rounded-2xl border border-gray-800/50 shadow-lg gap-4">
+            <div class="flex items-center gap-3">
+                <h1 class="text-3xl font-black text-red-600 tracking-tighter">SYNC<span class="text-white">WATCH</span></h1>
+            </div>
+            
+            <div class="flex flex-wrap justify-center gap-4 items-center">
+                <div class="bg-[#0f0f0f] px-4 py-2 rounded-lg border border-gray-800 flex items-center gap-2">
+                    <i class="fas fa-user text-red-500 text-sm"></i>
+                    <span class="text-sm font-semibold text-gray-300" id="displayUsername">...</span>
+                </div>
+                <div class="bg-[#0f0f0f] px-4 py-2 rounded-lg border border-gray-800 flex items-center gap-2">
+                    <i class="fas fa-users text-red-500 text-sm"></i>
+                    <span class="text-sm font-semibold text-gray-300"><span id="userCount">0</span> Kişi</span>
+                </div>
+                <button id="inviteBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-lg">
+                    <i class="fas fa-link"></i> Davet Et
+                </button>
+            </div>
+        </header>
+
+        <!-- İçerik Wrapper: Sol Video, Sağ Chat -->
+        <div class="flex flex-col lg:flex-row gap-6 w-full flex-1">
+            
+            <!-- SOL TARAF (Video & Arama) -->
+            <div class="flex-1 flex flex-col w-full min-w-0">
+                <!-- Search Bar -->
+                <div class="flex flex-col items-center w-full mb-4 relative">
+                    <div class="flex items-center w-full justify-center gap-2">
+                        <input type="text" id="searchInput" placeholder="Film veya Dizi arayın..." 
+                            class="bg-[#1a1a1a] border border-gray-700 text-white rounded-lg px-4 py-3 flex-1 max-w-xl focus:outline-none focus:border-red-500 transition-colors">
+                        <button id="searchBtn" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold transition-colors shadow-lg flex items-center gap-2">
+                            <i class="fa-solid fa-magnifying-glass"></i> Ara
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bölüm Seçici (Sadece Dizilerde Görünür) -->
+                <div id="episodeSelector" class="hidden gap-4 bg-[#1a1a1a] p-3 rounded-xl border border-gray-800 mb-4 items-center justify-center w-full shadow-lg">
+                    <span class="font-bold text-gray-400 text-sm">SEZON:</span>
+                    <input type="number" id="seasonInput" value="1" min="1" class="w-16 bg-[#0f0f0f] border border-gray-700 rounded-lg px-2 py-1 text-center text-white focus:outline-none focus:border-red-500">
+                    <span class="font-bold text-gray-400 text-sm">BÖLÜM:</span>
+                    <input type="number" id="episodeInput" value="1" min="1" class="w-16 bg-[#0f0f0f] border border-gray-700 rounded-lg px-2 py-1 text-center text-white focus:outline-none focus:border-red-500">
+                    <button id="changeEpisodeBtn" class="bg-white text-black hover:bg-gray-200 px-4 py-1 rounded-lg font-bold transition-colors ml-2 text-sm">Değiştir</button>
+                </div>
+
+                <!-- Video Player Container (Iframe) -->
+                <div class="w-full flex-1 min-h-[300px] lg:min-h-[500px] bg-black rounded-2xl overflow-hidden shadow-2xl relative border border-gray-800/50 flex items-center justify-center">
+                    
+                    <!-- Yükleme Ekranı -->
+                    <div id="loadingOverlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-10 hidden backdrop-blur-sm">
+                        <div class="w-16 h-16 border-4 border-red-600/30 border-t-red-600 rounded-full animate-spin mb-4"></div>
+                        <p class="text-lg font-medium text-red-500 animate-pulse" id="loadingText">Yükleniyor...</p>
+                    </div>
+                    
+                    <!-- Iframe Etiketi -->
+                    <iframe id="moviePlayer" src="" 
+                        class="w-full h-full absolute inset-0 transition-opacity duration-500 opacity-0 border-0 hidden"
+                        allowfullscreen 
+                        allow="autoplay; fullscreen">
+                    </iframe>
+
+                    <!-- Video boşken görünecek yer tutucu -->
+                    <div id="placeholder" class="flex flex-col items-center justify-center text-gray-700">
+                        <i class="fas fa-film text-6xl mb-4"></i>
+                        <p class="text-sm">Arama yaparak bir film veya dizi açın...</p>
+                    </div>
+                </div>
+
+                <!-- Geri Sayım Başlat Butonu -->
+                <div id="syncControls" class="text-center w-full bg-[#1a1a1a] border border-gray-800 p-4 rounded-xl mt-4 hidden shadow-lg">
+                    <p class="text-xs text-gray-400 mb-3">Butona bastığınızda herkesin ekranında geri sayım başlar. "BAŞLA" yazınca Play'e basın!</p>
+                    <button id="startCountdownBtn" class="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-xl font-black text-lg transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(220,38,38,0.4)] flex items-center gap-3 mx-auto">
+                        <i class="fas fa-stopwatch"></i> GERİ SAYIMI BAŞLAT!
+                    </button>
+                </div>
+            </div>
+
+            <!-- SAĞ TARAF (Sohbet Paneli) -->
+            <div class="w-full lg:w-80 xl:w-96 flex flex-col bg-[#1a1a1a] border border-gray-800 rounded-2xl overflow-hidden shadow-lg h-[400px] lg:h-auto">
+                <!-- Chat Header -->
+                <div class="bg-gray-900 border-b border-gray-800 p-4 flex items-center gap-2">
+                    <i class="fas fa-comments text-red-500"></i>
+                    <h2 class="font-bold">Oda Sohbeti</h2>
+                </div>
+                
+                <!-- Chat Messages Area -->
+                <div id="chatMessages" class="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3">
+                    <div class="text-center text-xs text-gray-600 my-2">Sohbete katıldınız. Küfür ve argo yasaktır! 😎</div>
+                </div>
+
+                <!-- Chat Input Area -->
+                <div class="bg-[#111] p-3 border-t border-gray-800 flex gap-2">
+                    <input type="text" id="chatInput" placeholder="Mesaj yaz..." 
+                        class="bg-[#222] border border-gray-700 text-white rounded-lg px-3 py-2 flex-1 text-sm focus:outline-none focus:border-red-500">
+                    <button id="chatSendBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 rounded-lg transition-colors">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+
+        </div> <!-- /contentWrapper -->
+    </div> <!-- /mainUI -->
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        // DOM Elements
+        const roomModal = document.getElementById('roomModal');
+        const mainUI = document.getElementById('mainUI');
+        const usernameInput = document.getElementById('usernameInput');
+        const roomInput = document.getElementById('roomInput');
+        const joinRoomBtn = document.getElementById('joinRoomBtn');
+        const displayUsername = document.getElementById('displayUsername');
+        const inviteBtn = document.getElementById('inviteBtn');
+        
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        
+        const moviePlayer = document.getElementById('moviePlayer');
+        const userCount = document.getElementById('userCount');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const placeholder = document.getElementById('placeholder');
+        
+        const syncControls = document.getElementById('syncControls');
+        const startCountdownBtn = document.getElementById('startCountdownBtn');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        const countdownNumber = document.getElementById('countdownNumber');
+        const countdownMessage = document.getElementById('countdownMessage');
+
+        const episodeSelector = document.getElementById('episodeSelector');
+        const seasonInput = document.getElementById('seasonInput');
+        const episodeInput = document.getElementById('episodeInput');
+        const changeEpisodeBtn = document.getElementById('changeEpisodeBtn');
+
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const chatSendBtn = document.getElementById('chatSendBtn');
+
+        let myRoom = null;
+        let myUsername = null;
+        let currentImdbId = null;
+
+        // --- URL'den Odayı Oku (Davet Linki Sistemi) ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomFromUrl = urlParams.get('room');
+        if (roomFromUrl) {
+            roomInput.value = roomFromUrl;
+        }
+
+        // --- DAVET ET BUTONU ---
+        inviteBtn.addEventListener('click', () => {
+            const inviteLink = window.location.origin + window.location.pathname + '?room=' + myRoom;
+            navigator.clipboard.writeText(inviteLink).then(() => {
+                const originalText = inviteBtn.innerHTML;
+                inviteBtn.innerHTML = '<i class="fas fa-check"></i> Kopyalandı!';
+                inviteBtn.classList.replace('bg-indigo-600', 'bg-green-600');
+                inviteBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-green-700');
+                setTimeout(() => {
+                    inviteBtn.innerHTML = originalText;
+                    inviteBtn.classList.replace('bg-green-600', 'bg-indigo-600');
+                    inviteBtn.classList.replace('hover:bg-green-700', 'hover:bg-indigo-700');
+                }, 2000);
+            }).catch(err => alert("Link kopyalanamadı: " + err));
+        });
+
+        // --- ODA GİRİŞ İŞLEMİ ---
+        joinRoomBtn.addEventListener('click', () => {
+            const rVal = roomInput.value.trim();
+            const uVal = usernameInput.value.trim();
+            
+            if(!uVal) return alert("Lütfen bir kullanıcı adı girin!");
+            if(!rVal) return alert("Lütfen bir oda kodu girin!");
+            
+            myRoom = rVal;
+            myUsername = uVal;
+            
+            socket.emit('joinRoom', { roomId: myRoom, username: myUsername });
+            
+            displayUsername.innerText = myUsername;
+            
+            // URL'yi güncelle (sayfayı yenilemeden)
+            window.history.replaceState({}, '', `?room=${myRoom}`);
+            
+            roomModal.classList.add('hidden');
+            mainUI.classList.remove('hidden');
+            mainUI.classList.add('flex');
+        });
+
+        socket.on('roomUsersCount', (count) => {
+            userCount.innerText = count;
+        });
+
+        // --- SOHBET SİSTEMİ ---
+        function appendChatMessage(username, text, isSystem = false) {
+            const div = document.createElement('div');
+            if (isSystem) {
+                div.className = "text-center text-xs font-semibold text-gray-500 my-1 bg-[#222] p-1 rounded-md mx-4";
+                div.innerText = text;
+            } else {
+                const isMe = username === myUsername;
+                div.className = `flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`;
+                div.innerHTML = `
+                    <span class="text-[10px] text-gray-500 mb-0.5 ml-1 mr-1">${username}</span>
+                    <div class="px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-red-600 text-white rounded-br-sm' : 'bg-gray-800 text-gray-200 rounded-bl-sm'}">
+                        ${text}
+                    </div>
+                `;
+            }
+            chatMessages.appendChild(div);
+            // Otomatik scroll
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        socket.on('systemMessage', (msg) => {
+            appendChatMessage("Sistem", msg, true);
+        });
+
+        socket.on('chatMessage', (data) => {
+            appendChatMessage(data.username, data.text, false);
+        });
+
+        function sendChat() {
+            const val = chatInput.value.trim();
+            if (val) {
+                socket.emit('chatMessage', val);
+                chatInput.value = '';
+            }
+        }
+
+        chatSendBtn.addEventListener('click', sendChat);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+
+
+        // --- FİLM/DİZİ ARAMA ---
+        async function searchMovie() {
+            const query = searchInput.value.trim();
+            if (!query) return;
+
+            loadingOverlay.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            moviePlayer.style.opacity = '0';
+
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    currentImdbId = data.imdbId;
+                    
+                    // Dizi ise bölüm seçiciyi göster
+                    if (data.isTv) {
+                        episodeSelector.classList.remove('hidden');
+                        episodeSelector.classList.add('flex');
+                    } else {
+                        episodeSelector.classList.add('hidden');
+                        episodeSelector.classList.remove('flex');
+                    }
+
+                    // Bulunan iframe adresini odadaki herkese duyur
+                    socket.emit('changeVideo', { url: data.url, title: data.movie });
+                } else {
+                    alert('Hata: ' + (data.error || 'Film bulunamadı.'));
+                    loadingOverlay.classList.add('hidden');
+                    if(moviePlayer.src === "") placeholder.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Arama sırasında bir sunucu hatası oluştu.');
+                loadingOverlay.classList.add('hidden');
+            }
+        }
+
+        searchBtn.addEventListener('click', searchMovie);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchMovie();
+        });
+
+        // --- BÖLÜM DEĞİŞTİRME SİSTEMİ ---
+        changeEpisodeBtn.addEventListener('click', () => {
+            if (!currentImdbId) return;
+            const s = seasonInput.value || 1;
+            const e = episodeInput.value || 1;
+            const url = `https://vidsrc.to/embed/tv/${currentImdbId}/${s}/${e}`;
+            
+            loadingOverlay.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            moviePlayer.style.opacity = '0';
+            
+            socket.emit('changeVideo', { url: url, title: `Sezon ${s} Bölüm ${e}` });
+        });
+
+        // --- VİDEO YÜKLEME ---
+        function loadVideo(url) {
+            loadingOverlay.classList.add('hidden');
+            placeholder.classList.add('hidden');
+            moviePlayer.classList.remove('hidden');
+            syncControls.classList.remove('hidden');
+            
+            moviePlayer.style.opacity = '0';
+            setTimeout(() => {
+                moviePlayer.src = url;
+                moviePlayer.onload = () => {
+                    moviePlayer.style.opacity = '1';
+                };
+            }, 300);
+        }
+
+        socket.on('updateVideo', (data) => {
+            if (data && data.url) {
+                // Eğer URL aynıysa sadece loading ekranını kaldır (zaten yüklü)
+                if (moviePlayer.src === data.url) {
+                    loadingOverlay.classList.add('hidden');
+                    placeholder.classList.add('hidden');
+                    moviePlayer.classList.remove('hidden');
+                    syncControls.classList.remove('hidden');
+                    moviePlayer.style.opacity = '1';
+                } else {
+                    loadVideo(data.url);
+                }
+            }
+        });
+
+        // --- SUNUCU KOPMA / YENİDEN BAĞLANMA DURUMU ---
+        socket.on('connect', () => {
+            if (myRoom && myUsername) {
+                // Sunucu yeniden başlatılırsa veya internet koparsa, odaya tekrar gir
+                socket.emit('joinRoom', { roomId: myRoom, username: myUsername });
+            }
+        });
+
+        // --- GERİ SAYIM SİSTEMİ ---
+        startCountdownBtn.addEventListener('click', () => {
+            socket.emit('startCountdown');
+        });
+
+        socket.on('triggerCountdown', () => {
+            countdownOverlay.classList.remove('hidden');
+            countdownMessage.classList.add('hidden');
+            countdownNumber.classList.remove('hidden');
+            
+            let count = 3;
+            countdownNumber.innerText = count;
+            countdownNumber.classList.add('countdown-text');
+
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownNumber.classList.remove('countdown-text');
+                    void countdownNumber.offsetWidth; 
+                    countdownNumber.classList.add('countdown-text');
+                    countdownNumber.innerText = count;
+                } else {
+                    clearInterval(interval);
+                    countdownNumber.classList.add('hidden');
+                    countdownMessage.classList.remove('hidden');
+                    
+                    setTimeout(() => {
+                        countdownOverlay.classList.add('hidden');
+                    }, 1500);
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
