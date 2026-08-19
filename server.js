@@ -353,8 +353,11 @@ io.on('connection', (socket) => {
                     socket.emit('authResult', { success: true, username });
                 } else if (type === 'login') {
                     const user = await User.findOne({ username });
-                    if (!user || user.password !== password) {
-                        return socket.emit('authResult', { success: false, message: 'Hatalı şifre veya kullanıcı adı!' });
+                    if (!user) {
+                        return socket.emit('authResult', { success: false, code: 'USER_NOT_FOUND', message: 'Kullanıcı adı bulunamadı!' });
+                    }
+                    if (user.password !== password) {
+                        return socket.emit('authResult', { success: false, code: 'WRONG_PASSWORD', message: 'Hatalı şifre!' });
                     }
                     socket.emit('authResult', { success: true, username });
                 }
@@ -373,8 +376,11 @@ io.on('connection', (socket) => {
                 saveUsers(users);
                 socket.emit('authResult', { success: true, username });
             } else if (type === 'login') {
-                if (!users[username] || users[username].password !== password) {
-                    return socket.emit('authResult', { success: false, message: 'Hatalı şifre veya kullanıcı adı!' });
+                if (!users[username]) {
+                    return socket.emit('authResult', { success: false, code: 'USER_NOT_FOUND', message: 'Kullanıcı adı bulunamadı!' });
+                }
+                if (users[username].password !== password) {
+                    return socket.emit('authResult', { success: false, code: 'WRONG_PASSWORD', message: 'Hatalı şifre!' });
                 }
                 socket.emit('authResult', { success: true, username });
             }

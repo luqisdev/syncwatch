@@ -33,7 +33,7 @@
         /* Instagram Başlık/Açıklama Gizleme Hilesi */
         .instagram-mode {
             top: -56px !important;
-            height: calc(100% + 125px) !important;
+            height: calc(100% + 220px) !important;
         }
     </style>
 </head>
@@ -356,6 +356,13 @@
 
         socket.on('authResult', (res) => {
             if (!res.success) {
+                // Eğer sunucu sıfırlandıysa ve "Kullanıcı adı bulunamadı" hatası aldıysak sessizce tekrar kayıt yap
+                if (res.code === 'USER_NOT_FOUND' && savedUser && savedPass) {
+                    console.log("[Auth] Sunucu veritabanı sıfırlanmış, otomatik yeniden kayıt yapılıyor...");
+                    socket.emit('auth', { username: savedUser, password: savedPass, type: 'register' });
+                    return;
+                }
+
                 // Otomatik giriş başarısızsa cache temizle ve modali aç
                 localStorage.removeItem('sw_username');
                 localStorage.removeItem('sw_password');
