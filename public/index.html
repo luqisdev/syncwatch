@@ -327,6 +327,15 @@
             tabLogin.classList.replace('border-red-600', 'border-transparent');
         });
 
+        // Sayfa yüklenince otomatik giriş denetimi
+        const savedUser = localStorage.getItem('sw_username');
+        const savedPass = localStorage.getItem('sw_password');
+        if (savedUser && savedPass) {
+            roomModal.classList.add('hidden'); // Modalın parlamasını önle
+            myUsername = savedUser;
+            socket.emit('auth', { username: savedUser, password: savedPass, type: 'login' });
+        }
+
         joinRoomBtn.addEventListener('click', () => {
             const uVal = usernameInput.value.trim();
             const pVal = passwordInput.value.trim();
@@ -335,23 +344,39 @@
             
             myUsername = uVal;
             socket.emit('auth', { username: uVal, password: pVal, type: authType });
+            window._tempPassword = pVal; // Geçici olarak tut, başarılı olunca localStorage'a at
         });
 
         socket.on('authResult', (res) => {
             if (!res.success) {
+                // Otomatik giriş başarısızsa cache temizle ve modali aç
+                localStorage.removeItem('sw_username');
+                localStorage.removeItem('sw_password');
                 alert(res.message);
+                roomModal.classList.remove('hidden');
                 return;
             }
             
-            // Başarılı giriş, Lobiye geç
-            roomModal.classList.add('hidden');
-            lobbyUI.classList.remove('hidden');
-            lobbyUI.classList.add('flex');
+            // Başarılı giriş verilerini kaydet
+            localStorage.setItem('sw_username', res.username);
+            if (window._tempPassword) {
+                localStorage.setItem('sw_password', window._tempPassword);
+                delete window._tempPassword;
+            } else if (savedPass) {
+                localStorage.setItem('sw_password', savedPass);
+            }
             
-            lobbyUsernameDisplay.innerText = res.username;
-
-            // Eğer URL'de hazır bir oda varsa, doğrudan o odaya girmek mantıklı olabilir. 
-            // Ancak kullanıcının kararına bıraktık (Input dolu gelecek).
+            // Eğer URL'de oda parametresi varsa, direkt lobiye uğramadan odaya gir
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomFromUrl = urlParams.get('room');
+            if (roomFromUrl) {
+                joinActualRoom(roomFromUrl);
+            } else {
+                roomModal.classList.add('hidden');
+                lobbyUI.classList.remove('hidden');
+                lobbyUI.classList.add('flex');
+                lobbyUsernameDisplay.innerText = res.username;
+            }
         });
 
         // Lobi İçi Aksiyonlar
