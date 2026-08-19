@@ -95,9 +95,13 @@ const roomsData = {}; // Her odanın kendi video durumunu tutar
 io.on('connection', (socket) => {
     console.log(`Yeni kullanıcı bağlandı: ${socket.id}`);
 
-    // Kullanıcının bulunduğu mevcut oda ve adı
+    // Kullanıcının bulunduğu mevcut oda, adı ve rastgele rengi
     let currentRoom = null;
     socket.username = "Misafir"; // Varsayılan
+    
+    // Kullanıcıya harika rastgele bir pastel/vibrant renk ata
+    const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
+    socket.color = colors[Math.floor(Math.random() * colors.length)];
 
     socket.on('joinRoom', (data) => {
         // data string (eski sürüm) veya obje olabilir
@@ -108,6 +112,10 @@ io.on('connection', (socket) => {
 
         if (currentRoom) {
             socket.leave(currentRoom);
+            if (roomsData[currentRoom] && roomsData[currentRoom].users) {
+                delete roomsData[currentRoom].users[socket.id];
+                io.to(currentRoom).emit('updateUsersList', Object.values(roomsData[currentRoom].users));
+            }
         }
         currentRoom = roomId;
         socket.join(roomId);
@@ -115,16 +123,21 @@ io.on('connection', (socket) => {
 
         // Oda verisi yoksa başlat
         if (!roomsData[roomId]) {
-            roomsData[roomId] = { url: '', time: 0, isPlaying: false, title: '' };
+            roomsData[roomId] = { url: '', time: 0, isPlaying: false, title: '', users: {}, chatHistory: [] };
         }
 
-        // Yeni katılana mevcut durumu gönder
+        // Odaya kullanıcıyı ekle
+        roomsData[roomId].users[socket.id] = { id: socket.id, username: socket.username, color: socket.color };
+
+        // Yeni katılana mevcut durumu ve geçmiş mesajları gönder
         socket.emit('updateVideo', roomsData[roomId]);
+        socket.emit('chatHistory', roomsData[roomId].chatHistory);
         
         // Odaya katılım mesajı (Sistem mesajı)
         io.to(roomId).emit('systemMessage', `${socket.username} odaya katıldı.`);
         
-        // Odadaki kişi sayısını herkese bildir
+        // Odadaki kişi sayısını ve isimlerini herkese bildir
+        io.to(roomId).emit('updateUsersList', Object.values(roomsData[roomId].users));
         const roomSize = io.sockets.adapter.rooms.get(roomId)?.size || 0;
         io.to(roomId).emit('roomUsersCount', roomSize);
     });
@@ -172,11 +185,34 @@ io.on('connection', (socket) => {
     // Sohbet (Chat) Mesajları
     socket.on('chatMessage', (msg) => {
         if (!currentRoom) return;
-        // Mesajı odadaki herkese (gönderen dahil) ilet
-        io.to(currentRoom).emit('chatMessage', {
+        
+        // Zaman bilgisi oluştur (HH:MM)
+        const now = new Date();
+        const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        
+        const messageData = {
             username: socket.username,
-            text: msg
-        });
+            text: msg,
+            time: timeStr,
+            color: socket.color
+        };
+
+        // Mesajı geçmişe ekle (En fazla 50 mesaj tutulur)
+        if (!roomsData[currentRoom].chatHistory) roomsData[currentRoom].chatHistory = [];
+        roomsData[currentRoom].chatHistory.push(messageData);
+        if (roomsData[currentRoom].chatHistory.length > 50) {
+            roomsData[currentRoom].chatHistory.shift();
+        }
+
+        // Mesajı odadaki herkese (gönderen dahil) ilet
+        io.to(currentRoom).emit('chatMessage', messageData);
+    });
+
+    // "Yazıyor..." Animasyonu İçin
+    socket.on('typing', (isTyping) => {
+        if (!currentRoom) return;
+        // Odaya, bu kişinin yazıp yazmadığını ilet (Kendisi hariç)
+        socket.to(currentRoom).emit('typing', { username: socket.username, isTyping });
     });
 
     socket.on('disconnect', () => {
@@ -185,6 +221,12 @@ io.on('connection', (socket) => {
             // Odadan ayrılma mesajı
             io.to(currentRoom).emit('systemMessage', `${socket.username} odadan ayrıldı.`);
             
+            // Kullanıcıyı listeden çıkar ve kalanlara listeyi yolla
+            if (roomsData[currentRoom] && roomsData[currentRoom].users) {
+                delete roomsData[currentRoom].users[socket.id];
+                io.to(currentRoom).emit('updateUsersList', Object.values(roomsData[currentRoom].users));
+            }
+
             const roomSize = io.sockets.adapter.rooms.get(currentRoom)?.size || 0;
             io.to(currentRoom).emit('roomUsersCount', roomSize);
         }

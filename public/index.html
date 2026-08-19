@@ -143,14 +143,25 @@
             <!-- SAĞ TARAF (Sohbet Paneli) -->
             <div class="w-full lg:w-80 xl:w-96 flex flex-col bg-[#1a1a1a] border border-gray-800 rounded-2xl overflow-hidden shadow-lg h-[400px] lg:h-auto">
                 <!-- Chat Header -->
-                <div class="bg-gray-900 border-b border-gray-800 p-4 flex items-center gap-2">
-                    <i class="fas fa-comments text-red-500"></i>
-                    <h2 class="font-bold">Oda Sohbeti</h2>
+                <div class="bg-gray-900 border-b border-gray-800 p-3 flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-comments text-red-500"></i>
+                        <h2 class="font-bold text-sm">Oda Sohbeti</h2>
+                    </div>
+                    <!-- Aktif Kullanıcılar -->
+                    <div id="activeUsersList" class="flex flex-wrap gap-1">
+                        <!-- Kullanıcı etiketleri buraya gelecek -->
+                    </div>
                 </div>
                 
                 <!-- Chat Messages Area -->
                 <div id="chatMessages" class="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3">
                     <div class="text-center text-xs text-gray-600 my-2">Sohbete katıldınız. Küfür ve argo yasaktır! 😎</div>
+                </div>
+
+                <!-- Yazıyor Animasyonu -->
+                <div id="typingIndicator" class="px-4 py-1 text-[10px] text-gray-500 italic hidden bg-[#111]">
+                    biri yazıyor...
                 </div>
 
                 <!-- Chat Input Area -->
@@ -201,10 +212,13 @@
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const chatSendBtn = document.getElementById('chatSendBtn');
+        const activeUsersList = document.getElementById('activeUsersList');
+        const typingIndicator = document.getElementById('typingIndicator');
 
         let myRoom = null;
         let myUsername = null;
         let currentImdbId = null;
+        let typingTimeout = null;
 
         // --- URL'den Odayı Oku (Davet Linki Sistemi) ---
         const urlParams = new URLSearchParams(window.location.search);
@@ -256,8 +270,20 @@
             userCount.innerText = count;
         });
 
+        // --- KULLANICI LİSTESİ GÜNCELLEMESİ ---
+        socket.on('updateUsersList', (users) => {
+            activeUsersList.innerHTML = '';
+            users.forEach(u => {
+                const badge = document.createElement('span');
+                badge.className = "text-[10px] px-2 py-0.5 rounded-full text-white font-semibold";
+                badge.style.backgroundColor = u.color;
+                badge.innerText = u.username;
+                activeUsersList.appendChild(badge);
+            });
+        });
+
         // --- SOHBET SİSTEMİ ---
-        function appendChatMessage(username, text, isSystem = false) {
+        function appendChatMessage(username, text, isSystem = false, timeStr = "", color = "#aaa") {
             const div = document.createElement('div');
             if (isSystem) {
                 div.className = "text-center text-xs font-semibold text-gray-500 my-1 bg-[#222] p-1 rounded-md mx-4";
@@ -265,11 +291,19 @@
             } else {
                 const isMe = username === myUsername;
                 div.className = `flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`;
+                
+                // Zamanı ayarla (Eğer yoksa şu anki zaman)
+                if (!timeStr) {
+                    const d = new Date();
+                    timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+                }
+
                 div.innerHTML = `
-                    <span class="text-[10px] text-gray-500 mb-0.5 ml-1 mr-1">${username}</span>
-                    <div class="px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-red-600 text-white rounded-br-sm' : 'bg-gray-800 text-gray-200 rounded-bl-sm'}">
+                    <span class="text-[10px] mb-0.5 ml-1 mr-1 font-bold" style="color: ${isMe ? '#ccc' : color}">${username}</span>
+                    <div class="px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-red-600 text-white rounded-br-sm' : 'bg-gray-800 text-gray-200 rounded-bl-sm'} shadow-md">
                         ${text}
                     </div>
+                    <span class="text-[9px] text-gray-600 mt-0.5 mx-1">${timeStr}</span>
                 `;
             }
             chatMessages.appendChild(div);
@@ -282,7 +316,37 @@
         });
 
         socket.on('chatMessage', (data) => {
-            appendChatMessage(data.username, data.text, false);
+            appendChatMessage(data.username, data.text, false, data.time, data.color);
+        });
+
+        socket.on('chatHistory', (history) => {
+            // Sadece bir kere temizle (Eğer yeni bağlandıysak)
+            chatMessages.innerHTML = '<div class="text-center text-xs text-gray-600 my-2">Sohbete katıldınız. Geçmiş mesajlar yüklendi. 😎</div>';
+            history.forEach(msg => {
+                appendChatMessage(msg.username, msg.text, false, msg.time, msg.color);
+            });
+        });
+
+        // Yazıyor... Animasyonu Kontrolü
+        chatInput.addEventListener('input', () => {
+            if (chatInput.value.trim().length > 0) {
+                socket.emit('typing', true);
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    socket.emit('typing', false);
+                }, 1500);
+            } else {
+                socket.emit('typing', false);
+            }
+        });
+
+        socket.on('typing', (data) => {
+            if (data.isTyping) {
+                typingIndicator.innerText = `${data.username} yazıyor...`;
+                typingIndicator.classList.remove('hidden');
+            } else {
+                typingIndicator.classList.add('hidden');
+            }
         });
 
         function sendChat() {
@@ -290,6 +354,7 @@
             if (val) {
                 socket.emit('chatMessage', val);
                 chatInput.value = '';
+                socket.emit('typing', false);
             }
         }
 
