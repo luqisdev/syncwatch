@@ -172,7 +172,7 @@
                     </div>
                     
                     <iframe id="moviePlayer" src="" 
-                        class="w-full h-full absolute inset-0 transition-opacity duration-500 opacity-0 border-0 hidden"
+                        class="w-full h-full absolute top-0 left-0 transition-opacity duration-500 opacity-0 border-0 hidden"
                         allowfullscreen 
                         allow="autoplay; fullscreen"
                         scrolling="no">
@@ -741,20 +741,20 @@
 
                 // Instagram moduna göre iframe ve container boyutlarını ayarla
                 if (data.mediaType === 'instagram') {
-                    // Maskeleri göster (Beyaz 'Daha fazlasını gör' alanını tamamen kapatmak için)
-                    instaHeaderOverlay.classList.remove('hidden');
-                    instaFooterOverlay.classList.remove('hidden');
+                    // Maskeleri gizle (Koyu mod ve temiz çerçeve kullandığımız için maskelere gerek kalmadı)
+                    instaHeaderOverlay.classList.add('hidden');
+                    instaFooterOverlay.classList.add('hidden');
 
-                    // Instagram embed kartının gerçek genişliği olan 328px'e sabitle (yanlardaki siyah boşlukları yok etmek için)
-                    playerContainer.style.width = '328px';
-                    playerContainer.style.height = '400px';
+                    // Şık bir dikey telefon çerçevesine sabitle (360x640px - 9:16)
+                    playerContainer.style.width = '360px';
+                    playerContainer.style.height = '640px';
                     playerContainer.style.aspectRatio = 'auto';
                     playerContainer.classList.remove('aspect-video', 'max-w-5xl', 'w-full');
 
-                    // Iframe tam olarak 328px kart boyutuna göre kırpılır
-                    moviePlayer.style.setProperty('top', '-54px', 'important');
-                    moviePlayer.style.setProperty('height', '540px', 'important');
-                    moviePlayer.style.setProperty('width', '328px', 'important');
+                    // Iframe çerçeveyi tamamen doldurur, Instagram kartı içeride doğal olarak hizalanır
+                    moviePlayer.style.setProperty('top', '0px', 'important');
+                    moviePlayer.style.setProperty('height', '100%', 'important');
+                    moviePlayer.style.setProperty('width', '100%', 'important');
                 } else {
                     // Maskeleri gizle
                     instaHeaderOverlay.classList.add('hidden');
