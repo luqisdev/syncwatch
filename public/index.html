@@ -178,6 +178,10 @@
                         scrolling="no">
                     </iframe>
 
+                    <!-- Instagram Maskeleme Overlay Katmanları -->
+                    <div id="instaHeaderOverlay" class="absolute top-0 left-0 right-0 h-[56px] bg-black z-20 pointer-events-none hidden"></div>
+                    <div id="instaFooterOverlay" class="absolute bottom-0 left-0 right-0 h-[125px] bg-black z-20 pointer-events-none hidden"></div>
+
                     <div id="placeholder" class="flex flex-col items-center justify-center text-gray-700 h-full">
                         <i class="fas fa-film text-6xl mb-4 opacity-50"></i>
                         <p class="text-sm">Arama yaparak bir film veya dizi açın...</p>
@@ -731,18 +735,38 @@
         socket.on('updateVideo', (data) => {
             if (data && data.url) {
                 const playerContainer = document.getElementById('playerContainer');
+                const instaHeaderOverlay = document.getElementById('instaHeaderOverlay');
+                const instaFooterOverlay = document.getElementById('instaFooterOverlay');
 
                 // Instagram moduna göre iframe ve container boyutlarını ayarla
                 if (data.mediaType === 'instagram') {
-                    moviePlayer.style.setProperty('top', '-12%', 'important');
-                    moviePlayer.style.setProperty('height', '142%', 'important');
-                    playerContainer.classList.remove('aspect-video', 'max-w-5xl');
-                    playerContainer.classList.add('aspect-[9/16]', 'max-w-xs', 'sm:max-w-sm');
+                    // Maskeleri gizle (sabit boyut kırpması kullandığımız için ihtiyaç kalmadı)
+                    instaHeaderOverlay.classList.add('hidden');
+                    instaFooterOverlay.classList.add('hidden');
+
+                    // Sabit telefon boyutuna sabitle (kesin kırpma sağlamak için)
+                    playerContainer.style.width = '340px';
+                    playerContainer.style.height = '480px';
+                    playerContainer.style.aspectRatio = 'auto';
+                    playerContainer.classList.remove('aspect-video', 'max-w-5xl', 'w-full');
+
+                    // Iframe kırpma konumları
+                    moviePlayer.style.setProperty('top', '-54px', 'important');
+                    moviePlayer.style.setProperty('height', '590px', 'important');
+                    moviePlayer.style.setProperty('width', '340px', 'important');
                 } else {
+                    instaHeaderOverlay.classList.add('hidden');
+                    instaFooterOverlay.classList.add('hidden');
+
+                    // Normal mod (Film/Dizi geniş ekran)
+                    playerContainer.style.width = '';
+                    playerContainer.style.height = '';
+                    playerContainer.style.aspectRatio = '';
+                    playerContainer.classList.add('aspect-video', 'max-w-5xl', 'w-full');
+
                     moviePlayer.style.setProperty('top', '0px', 'important');
                     moviePlayer.style.setProperty('height', '100%', 'important');
-                    playerContainer.classList.remove('aspect-[9/16]', 'max-w-xs', 'sm:max-w-sm');
-                    playerContainer.classList.add('aspect-video', 'max-w-5xl');
+                    moviePlayer.style.setProperty('width', '100%', 'important');
                 }
 
                 // Eğer URL aynıysa sadece loading ekranını kaldır (zaten yüklü)
