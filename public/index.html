@@ -444,8 +444,8 @@
         socket.on('updateUsersList', (data) => {
             activeUsersList.innerHTML = '';
             
-            // Yetkimi güncelle
-            amIAdmin = (socket.id === data.adminId);
+            // Yetkimi username üzerinden kontrol et
+            amIAdmin = (myUsername === data.adminId);
 
             data.users.forEach(u => {
                 const badge = document.createElement('span');
@@ -457,7 +457,8 @@
                 
                 badge.style.backgroundColor = u.color;
                 
-                const crown = (u.id === data.adminId) ? '<i class="fas fa-crown text-yellow-300"></i> ' : '';
+                // Crown'ı username eşleşmesine göre çiz
+                const crown = (u.username === data.adminId) ? '<i class="fas fa-crown text-yellow-300"></i> ' : '';
                 badge.innerHTML = crown + u.username;
                 activeUsersList.appendChild(badge);
             });

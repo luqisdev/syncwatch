@@ -184,7 +184,7 @@ io.on('connection', (socket) => {
 
         // İlk giren kişi veya admin yoksa admin yap
         if (!roomsData[roomId].admin) {
-            roomsData[roomId].admin = socket.id;
+            roomsData[roomId].admin = socket.username;
         }
 
         // Odaya kullanıcıyı ekle
@@ -219,7 +219,7 @@ io.on('connection', (socket) => {
     // Film kaynağı değiştiğinde (Oda bazlı)
     socket.on('changeVideo', (data) => {
         if (!currentRoom) return;
-        if (roomsData[currentRoom].admin !== socket.id) return;
+        if (roomsData[currentRoom].admin !== socket.username) return;
 
         console.log(`[Socket] ${currentRoom} odasında ${socket.username} video değiştirdi: ${data.url}`);
         roomsData[currentRoom] = { 
@@ -237,7 +237,7 @@ io.on('connection', (socket) => {
     // Kuyruktan Sonrakine Geç
     socket.on('playNext', () => {
         if (!currentRoom) return;
-        if (roomsData[currentRoom].admin !== socket.id) return;
+        if (roomsData[currentRoom].admin !== socket.username) return;
         
         if (roomsData[currentRoom].queue.length > 0) {
             const nextMedia = roomsData[currentRoom].queue.shift();
@@ -261,7 +261,7 @@ io.on('connection', (socket) => {
     socket.on('startCountdown', () => {
         if (!currentRoom) return;
         // YALNIZCA ADMİN BAŞLATABİLİR
-        if (roomsData[currentRoom].admin !== socket.id) return;
+        if (roomsData[currentRoom].admin !== socket.username) return;
 
         console.log(`[Socket] ${currentRoom} odasında geri sayım başlatıldı.`);
         io.to(currentRoom).emit('triggerCountdown');
@@ -399,11 +399,11 @@ io.on('connection', (socket) => {
 
     // Admin Yetki Devri
     socket.on('transferAdmin', (targetSocketId) => {
-        if (!currentRoom || roomsData[currentRoom].admin !== socket.id) return;
+        if (!currentRoom || roomsData[currentRoom].admin !== socket.username) return;
         if (roomsData[currentRoom].users[targetSocketId]) {
-            roomsData[currentRoom].admin = targetSocketId;
-            const newAdminName = roomsData[currentRoom].users[targetSocketId].username;
-            io.to(currentRoom).emit('systemMessage', `${newAdminName} odanın yeni yöneticisi oldu! 👑`);
+            const targetUser = roomsData[currentRoom].users[targetSocketId];
+            roomsData[currentRoom].admin = targetUser.username;
+            io.to(currentRoom).emit('systemMessage', `${targetUser.username} odanın yeni yöneticisi oldu! 👑`);
             io.to(currentRoom).emit('updateUsersList', {
                 users: Object.values(roomsData[currentRoom].users),
                 adminId: roomsData[currentRoom].admin
@@ -413,7 +413,7 @@ io.on('connection', (socket) => {
 
     // Kullanıcıyı Odadan Atma (Kick)
     socket.on('kickUser', (targetSocketId) => {
-        if (!currentRoom || roomsData[currentRoom].admin !== socket.id) return;
+        if (!currentRoom || roomsData[currentRoom].admin !== socket.username) return;
         if (targetSocketId === socket.id) return; // Kendini atamaz
         
         const targetSocket = io.sockets.sockets.get(targetSocketId);
@@ -434,13 +434,17 @@ io.on('connection', (socket) => {
                 delete roomsData[currentRoom].users[socket.id];
                 
                 // Eğer ayrılan kişi Admin ise, yetkiyi odada kalan ilk kişiye devret
-                if (roomsData[currentRoom].admin === socket.id) {
-                    const remainingUsers = Object.keys(roomsData[currentRoom].users);
-                    if (remainingUsers.length > 0) {
-                        roomsData[currentRoom].admin = remainingUsers[0];
-                        io.to(currentRoom).emit('systemMessage', `${roomsData[currentRoom].users[remainingUsers[0]].username} odanın yeni yöneticisi oldu! 👑`);
-                    } else {
-                        roomsData[currentRoom].admin = null;
+                if (roomsData[currentRoom].admin === socket.username) {
+                    // Ayrılan admin gerçekten çıktı mı (yoksa F5 atıp re-connect mi oldu) kontrol et
+                    const stillHere = Object.values(roomsData[currentRoom].users).some(u => u.username === socket.username && u.id !== socket.id);
+                    if (!stillHere) {
+                        const remainingUsers = Object.values(roomsData[currentRoom].users).filter(u => u.id !== socket.id);
+                        if (remainingUsers.length > 0) {
+                            roomsData[currentRoom].admin = remainingUsers[0].username;
+                            io.to(currentRoom).emit('systemMessage', `${roomsData[currentRoom].admin} odanın yeni yöneticisi oldu! 👑`);
+                        } else {
+                            roomsData[currentRoom].admin = null;
+                        }
                     }
                 }
 
