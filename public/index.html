@@ -734,11 +734,13 @@
 
                 // Instagram moduna göre iframe ve container boyutlarını ayarla
                 if (data.mediaType === 'instagram') {
-                    moviePlayer.classList.add('instagram-mode');
+                    moviePlayer.style.setProperty('top', '-12%', 'important');
+                    moviePlayer.style.setProperty('height', '142%', 'important');
                     playerContainer.classList.remove('aspect-video', 'max-w-5xl');
                     playerContainer.classList.add('aspect-[9/16]', 'max-w-xs', 'sm:max-w-sm');
                 } else {
-                    moviePlayer.classList.remove('instagram-mode');
+                    moviePlayer.style.setProperty('top', '0px', 'important');
+                    moviePlayer.style.setProperty('height', '100%', 'important');
                     playerContainer.classList.remove('aspect-[9/16]', 'max-w-xs', 'sm:max-w-sm');
                     playerContainer.classList.add('aspect-video', 'max-w-5xl');
                 }
