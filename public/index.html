@@ -744,16 +744,16 @@
                     instaHeaderOverlay.classList.remove('hidden');
                     instaFooterOverlay.classList.remove('hidden');
 
-                    // Sabit telefon boyutuna sabitle (kesin kırpma sağlamak ve videoyu büyütmek için)
-                    playerContainer.style.width = '400px';
-                    playerContainer.style.height = '530px';
+                    // Instagram embed kartının gerçek genişliği olan 328px'e sabitle (yanlardaki siyah boşlukları yok etmek için)
+                    playerContainer.style.width = '328px';
+                    playerContainer.style.height = '400px';
                     playerContainer.style.aspectRatio = 'auto';
                     playerContainer.classList.remove('aspect-video', 'max-w-5xl', 'w-full');
 
-                    // Iframe kırpma konumları
+                    // Iframe tam olarak 328px kart boyutuna göre kırpılır
                     moviePlayer.style.setProperty('top', '-54px', 'important');
-                    moviePlayer.style.setProperty('height', '645px', 'important');
-                    moviePlayer.style.setProperty('width', '400px', 'important');
+                    moviePlayer.style.setProperty('height', '540px', 'important');
+                    moviePlayer.style.setProperty('width', '328px', 'important');
                 } else {
                     // Maskeleri gizle
                     instaHeaderOverlay.classList.add('hidden');
