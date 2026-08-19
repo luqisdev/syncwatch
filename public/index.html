@@ -52,13 +52,51 @@
             <input type="text" id="usernameInput" placeholder="Kullanıcı Adınız" 
                 class="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-500 font-medium">
             <input type="password" id="passwordInput" placeholder="Şifreniz" 
-                class="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-500 font-medium">
-            <input type="text" id="roomInput" placeholder="Oda Kodu (İsteğe Bağlı)" 
                 class="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 mb-6 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-500 font-medium">
                 
             <button id="joinRoomBtn" class="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all transform hover:scale-105 active:scale-95 flex justify-center items-center gap-2">
-                <i class="fas fa-sign-in-alt"></i> Odaya Katıl
+                <i class="fas fa-sign-in-alt"></i> Devam Et
             </button>
+        </div>
+    </div>
+
+    <!-- LOBİ (ANA SAYFA) EKRANI -->
+    <div id="lobbyUI" class="hidden min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-900 via-[#0a0a0a] to-black text-white flex-col items-center justify-center w-full relative">
+        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+            <div class="absolute top-[20%] left-[20%] w-[40%] h-[40%] bg-red-600/10 rounded-full blur-[120px]"></div>
+            <div class="absolute bottom-[20%] right-[20%] w-[30%] h-[30%] bg-red-900/10 rounded-full blur-[100px]"></div>
+        </div>
+        
+        <h1 class="text-5xl md:text-6xl font-black text-red-600 mb-2 tracking-tighter drop-shadow-lg z-10">SYNC<span class="text-white">WATCH</span></h1>
+        <p class="text-gray-400 mb-12 text-lg font-light z-10">Hoş geldin, <span id="lobbyUsernameDisplay" class="font-bold text-white">...</span>! Ne yapmak istersin?</p>
+        
+        <div class="flex flex-col sm:flex-row gap-6 md:gap-8 z-10 w-full max-w-4xl px-4 justify-center items-stretch">
+            
+            <!-- Oda Oluştur Kartı -->
+            <div class="bg-black/40 border border-white/10 p-8 rounded-3xl shadow-[0_0_50px_rgba(220,38,38,0.1)] backdrop-blur-xl flex-1 text-center hover:scale-105 transition-transform duration-300 flex flex-col justify-between">
+                <div>
+                    <i class="fa-solid fa-plus text-5xl text-red-500 mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]"></i>
+                    <h2 class="text-2xl font-bold text-white mb-2">Yeni Oda Kur</h2>
+                    <p class="text-gray-400 text-sm mb-6">Arkadaşlarını davet etmek için özel bir oda oluştur. Kumanda sende olsun.</p>
+                </div>
+                <button id="createRoomBtn" class="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.3)] transition-all">
+                    Oda Oluştur
+                </button>
+            </div>
+            
+            <!-- Odaya Katıl Kartı -->
+            <div class="bg-black/40 border border-white/10 p-8 rounded-3xl shadow-[0_0_50px_rgba(220,38,38,0.1)] backdrop-blur-xl flex-1 text-center hover:scale-105 transition-transform duration-300 flex flex-col justify-between">
+                <div>
+                    <i class="fa-solid fa-right-to-bracket text-5xl text-gray-300 mb-6"></i>
+                    <h2 class="text-2xl font-bold text-white mb-2">Mevcut Odaya Katıl</h2>
+                    <p class="text-gray-400 text-sm mb-6">Arkadaşının sana gönderdiği özel oda kodunu girerek izlemeye katıl.</p>
+                    <input type="text" id="lobbyRoomInput" placeholder="Oda Kodu (Örn: oda-123)" class="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3.5 mb-4 focus:outline-none focus:ring-2 focus:ring-red-500/50 text-center font-bold placeholder-gray-600">
+                </div>
+                <button id="joinLobbyRoomBtn" class="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all border border-white/5">
+                    Odaya Gir
+                </button>
+            </div>
+            
         </div>
     </div>
 
@@ -238,11 +276,17 @@
         let typingTimeout = null;
         let amIAdmin = false;
 
+        const lobbyUI = document.getElementById('lobbyUI');
+        const lobbyUsernameDisplay = document.getElementById('lobbyUsernameDisplay');
+        const createRoomBtn = document.getElementById('createRoomBtn');
+        const joinLobbyRoomBtn = document.getElementById('joinLobbyRoomBtn');
+        const lobbyRoomInput = document.getElementById('lobbyRoomInput');
+
         // --- URL'den Odayı Oku (Davet Linki Sistemi) ---
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
         if (roomFromUrl) {
-            roomInput.value = roomFromUrl;
+            lobbyRoomInput.value = roomFromUrl;
         }
 
         // --- DAVET ET BUTONU ---
@@ -284,16 +328,12 @@
         });
 
         joinRoomBtn.addEventListener('click', () => {
-            const rVal = roomInput.value.trim() || 'genel';
             const uVal = usernameInput.value.trim();
             const pVal = passwordInput.value.trim();
             
             if(!uVal || !pVal) return alert("Lütfen kullanıcı adı ve şifrenizi girin!");
-            if(!rVal) return alert("Lütfen bir oda kodu girin!");
             
-            myRoom = rVal;
             myUsername = uVal;
-            
             socket.emit('auth', { username: uVal, password: pVal, type: authType });
         });
 
@@ -302,23 +342,56 @@
                 alert(res.message);
                 return;
             }
-            // Başarılı giriş
-            socket.emit('joinRoom', { roomId: myRoom, username: res.username });
+            
+            // Başarılı giriş, Lobiye geç
+            roomModal.classList.add('hidden');
+            lobbyUI.classList.remove('hidden');
+            lobbyUI.classList.add('flex');
+            
+            lobbyUsernameDisplay.innerText = res.username;
+
+            // Eğer URL'de hazır bir oda varsa, doğrudan o odaya girmek mantıklı olabilir. 
+            // Ancak kullanıcının kararına bıraktık (Input dolu gelecek).
+        });
+
+        // Lobi İçi Aksiyonlar
+        createRoomBtn.addEventListener('click', () => {
+            // Rastgele şık bir oda kodu üret
+            const randomCode = 'oda-' + Math.random().toString(36).substr(2, 6);
+            joinActualRoom(randomCode);
+        });
+
+        joinLobbyRoomBtn.addEventListener('click', () => {
+            const rVal = lobbyRoomInput.value.trim();
+            if (!rVal) return alert("Lütfen bir oda kodu girin!");
+            joinActualRoom(rVal);
+        });
+
+        function joinActualRoom(roomId) {
+            myRoom = roomId;
+            socket.emit('joinRoom', { roomId: myRoom, username: myUsername });
             
             displayUsername.innerText = myUsername;
             window.history.replaceState({}, '', `?room=${myRoom}`);
-            roomModal.classList.add('hidden');
+            
+            lobbyUI.classList.remove('flex');
+            lobbyUI.classList.add('hidden');
+            
             mainUI.classList.remove('hidden');
             mainUI.classList.add('flex');
-        });
+        }
 
-        // Enter tuşu ile giriş
+        // Enter tuşu ile giriş (Auth Ekranı İçin)
         const authWithEnter = (e) => {
             if (e.key === 'Enter') joinRoomBtn.click();
         };
         usernameInput.addEventListener('keypress', authWithEnter);
         passwordInput.addEventListener('keypress', authWithEnter);
-        roomInput.addEventListener('keypress', authWithEnter);
+
+        // Enter tuşu ile odaya giriş (Lobi Ekranı İçin)
+        lobbyRoomInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') joinLobbyRoomBtn.click();
+        });
 
         socket.on('roomUsersCount', (count) => {
             userCount.innerText = count;
