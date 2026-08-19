@@ -615,7 +615,7 @@
                 episodeSelector.classList.add('hidden');
                 episodeSelector.classList.remove('flex');
                 return socket.emit('changeVideo', { 
-                    url: `https://www.instagram.com/p/${instaMatch[1]}/embed/`, 
+                    url: `https://www.instagram.com/p/${instaMatch[1]}/embed/?hidecaption=true`, 
                     title: `Instagram Postu`,
                     mediaType: 'instagram'
                 });

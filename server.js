@@ -291,7 +291,7 @@ io.on('connection', (socket) => {
             } else if (instaMatch) {
                 mediaObj = {
                     title: `Instagram Postu`,
-                    url: `https://www.instagram.com/p/${instaMatch[1]}/embed/`,
+                    url: `https://www.instagram.com/p/${instaMatch[1]}/embed/?hidecaption=true`,
                     type: 'instagram',
                     addedBy: socket.username
                 };
