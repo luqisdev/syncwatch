@@ -643,8 +643,8 @@
             moviePlayer.style.opacity = '0';
 
             // Direk Link Kontrolü (YouTube / Instagram)
-            const ytMatch = query.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-            const instaMatch = query.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/i);
+            const ytMatch = query.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|shorts\/)|youtu\.be\/)([^"&?\/\s]{11})/i);
+            const instaMatch = query.match(/instagram\.com\/(?:p|reel|reels|share\/reel)\/([A-Za-z0-9_-]+)/i);
 
             if (ytMatch) {
                 episodeSelector.classList.add('hidden');

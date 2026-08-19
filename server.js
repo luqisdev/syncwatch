@@ -200,8 +200,9 @@ io.on('connection', (socket) => {
 
         roomsData[roomId].users[socket.id] = { id: socket.id, username: socket.username, color: socket.color };
 
-        // Yeni katılana mevcut durumu ve geçmiş mesajları gönder
+        // Yeni katılana mevcut durumu, kuyruğu ve geçmiş mesajları gönder
         socket.emit('updateVideo', roomsData[roomId]);
+        socket.emit('queueUpdated', roomsData[roomId].queue);
         socket.emit('chatHistory', roomsData[roomId].chatHistory);
         
         // Odaya katılım mesajı (Sistem mesajı)
@@ -312,8 +313,8 @@ io.on('connection', (socket) => {
         io.to(currentRoom).emit('chatMessage', messageData);
 
         // --- Link Algılama (YouTube, Instagram vs.) ---
-        const ytMatch = msg.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-        const instaMatch = msg.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/i);
+        const ytMatch = msg.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|shorts\/)|youtu\.be\/)([^"&?\/\s]{11})/i);
+        const instaMatch = msg.match(/instagram\.com\/(?:p|reel|reels|share\/reel)\/([A-Za-z0-9_-]+)/i);
 
         if (ytMatch || instaMatch) {
             let mediaObj = null;
