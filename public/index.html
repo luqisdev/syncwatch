@@ -29,6 +29,12 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 10px; }
+
+        /* Instagram Başlık/Açıklama Gizleme Hilesi */
+        .instagram-mode {
+            top: -56px !important;
+            height: calc(100% + 125px) !important;
+        }
     </style>
 </head>
 <body class="text-white min-h-screen flex flex-col items-center">
@@ -716,6 +722,13 @@
 
         socket.on('updateVideo', (data) => {
             if (data && data.url) {
+                // Instagram moduna göre iframe CSS sınıfını ayarla
+                if (data.mediaType === 'instagram') {
+                    moviePlayer.classList.add('instagram-mode');
+                } else {
+                    moviePlayer.classList.remove('instagram-mode');
+                }
+
                 // Eğer URL aynıysa sadece loading ekranını kaldır (zaten yüklü)
                 if (moviePlayer.src === data.url) {
                     loadingOverlay.classList.add('hidden');
