@@ -188,6 +188,16 @@ io.on('connection', (socket) => {
         }
 
         // Odaya kullanıcıyı ekle
+        // Önce aynı kullanıcı adına sahip eski hayalet/stale bağlantıları temizle (F5 atınca mükerrer kullanıcıyı önlemek için)
+        if (roomsData[roomId] && roomsData[roomId].users) {
+            for (const sid in roomsData[roomId].users) {
+                if (roomsData[roomId].users[sid].username === socket.username && sid !== socket.id) {
+                    delete roomsData[roomId].users[sid];
+                    console.log(`[Socket] Eski hayalet bağlantı temizlendi: ${socket.username} (${sid})`);
+                }
+            }
+        }
+
         roomsData[roomId].users[socket.id] = { id: socket.id, username: socket.username, color: socket.color };
 
         // Yeni katılana mevcut durumu ve geçmiş mesajları gönder
@@ -202,7 +212,7 @@ io.on('connection', (socket) => {
             users: Object.values(roomsData[roomId].users),
             adminId: roomsData[roomId].admin
         });
-        const roomSize = io.sockets.adapter.rooms.get(roomId)?.size || 0;
+        const roomSize = Object.keys(roomsData[roomId].users).length;
         io.to(roomId).emit('roomUsersCount', roomSize);
     });
 
@@ -440,7 +450,7 @@ io.on('connection', (socket) => {
                 });
             }
 
-            const roomSize = io.sockets.adapter.rooms.get(currentRoom)?.size || 0;
+            const roomSize = roomsData[currentRoom] && roomsData[currentRoom].users ? Object.keys(roomsData[currentRoom].users).length : 0;
             io.to(currentRoom).emit('roomUsersCount', roomSize);
         }
     });
