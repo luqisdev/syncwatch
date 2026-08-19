@@ -88,8 +88,13 @@
             
             <!-- SOL TARAF (Video & Arama) -->
             <div class="flex-1 flex flex-col w-full min-w-0">
+                <!-- YALNIZCA ADMİN GÖREBİLİR UYARISI (Misafirler için) -->
+                <div id="guestWarning" class="w-full text-center py-3 bg-[#1a1a1a] border border-gray-800 rounded-xl mb-4 hidden text-gray-400 text-sm font-semibold shadow-lg">
+                    <i class="fas fa-lock mr-2 text-gray-500"></i>Kumanda Oda Yöneticisinde. Lütfen bir film açmasını bekleyin...
+                </div>
+
                 <!-- Search Bar -->
-                <div class="flex flex-col items-center w-full mb-4 relative">
+                <div id="searchContainer" class="flex-col items-center w-full mb-4 relative hidden">
                     <div class="flex items-center w-full justify-center gap-2">
                         <input type="text" id="searchInput" placeholder="Film veya Dizi arayın..." 
                             class="bg-[#1a1a1a] border border-gray-700 text-white rounded-lg px-4 py-3 flex-1 max-w-xl focus:outline-none focus:border-red-500 transition-colors">
@@ -190,6 +195,8 @@
         const displayUsername = document.getElementById('displayUsername');
         const inviteBtn = document.getElementById('inviteBtn');
         
+        const guestWarning = document.getElementById('guestWarning');
+        const searchContainer = document.getElementById('searchContainer');
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         
@@ -219,6 +226,7 @@
         let myUsername = null;
         let currentImdbId = null;
         let typingTimeout = null;
+        let amIAdmin = false;
 
         // --- URL'den Odayı Oku (Davet Linki Sistemi) ---
         const urlParams = new URLSearchParams(window.location.search);
@@ -271,15 +279,40 @@
         });
 
         // --- KULLANICI LİSTESİ GÜNCELLEMESİ ---
-        socket.on('updateUsersList', (users) => {
+        socket.on('updateUsersList', (data) => {
             activeUsersList.innerHTML = '';
-            users.forEach(u => {
+            
+            // Yetkimi güncelle
+            amIAdmin = (socket.id === data.adminId);
+
+            data.users.forEach(u => {
                 const badge = document.createElement('span');
-                badge.className = "text-[10px] px-2 py-0.5 rounded-full text-white font-semibold";
+                badge.className = "text-[10px] px-2 py-0.5 rounded-full text-white font-semibold flex items-center gap-1";
                 badge.style.backgroundColor = u.color;
-                badge.innerText = u.username;
+                
+                const crown = (u.id === data.adminId) ? '<i class="fas fa-crown text-yellow-300"></i> ' : '';
+                badge.innerHTML = crown + u.username;
                 activeUsersList.appendChild(badge);
             });
+
+            // Yetki Kontrolü (Arama çubuğu ve sync kontrolleri gösterimi)
+            if (amIAdmin) {
+                guestWarning.classList.add('hidden');
+                searchContainer.classList.remove('hidden');
+                searchContainer.classList.add('flex');
+                
+                // Video yüklüyse geri sayım butonunu göster
+                if (moviePlayer.src && moviePlayer.src !== window.location.href) {
+                    syncControls.classList.remove('hidden');
+                }
+            } else {
+                searchContainer.classList.add('hidden');
+                searchContainer.classList.remove('flex');
+                syncControls.classList.add('hidden');
+                guestWarning.classList.remove('hidden');
+                episodeSelector.classList.add('hidden');
+                episodeSelector.classList.remove('flex');
+            }
         });
 
         // --- SOHBET SİSTEMİ ---
@@ -427,7 +460,11 @@
             loadingOverlay.classList.add('hidden');
             placeholder.classList.add('hidden');
             moviePlayer.classList.remove('hidden');
-            syncControls.classList.remove('hidden');
+            
+            // Eğer adminsek butonları göster
+            if (amIAdmin) {
+                syncControls.classList.remove('hidden');
+            }
             
             moviePlayer.style.opacity = '0';
             setTimeout(() => {
@@ -445,7 +482,7 @@
                     loadingOverlay.classList.add('hidden');
                     placeholder.classList.add('hidden');
                     moviePlayer.classList.remove('hidden');
-                    syncControls.classList.remove('hidden');
+                    if (amIAdmin) syncControls.classList.remove('hidden');
                     moviePlayer.style.opacity = '1';
                 } else {
                     loadVideo(data.url);
