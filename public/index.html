@@ -182,6 +182,11 @@
                     <div id="instaHeaderOverlay" class="absolute top-0 left-0 right-0 h-[56px] bg-black z-20 pointer-events-none hidden"></div>
                     <div id="instaFooterOverlay" class="absolute bottom-0 left-0 right-0 h-[90px] bg-black z-20 pointer-events-none hidden"></div>
 
+                    <!-- Özel Senkronize Altyazı Overlay Katmanı -->
+                    <div id="subtitleOverlay" class="absolute bottom-10 left-0 right-0 text-center pointer-events-none z-30 select-none hidden">
+                        <span id="subtitleText" class="bg-black/85 text-white font-semibold text-base sm:text-lg px-4 py-2 rounded-xl border border-white/10 shadow-2xl inline-block max-w-[85%] break-words"></span>
+                    </div>
+
                     <div id="placeholder" class="flex flex-col items-center justify-center text-gray-700 h-full">
                         <i class="fas fa-film text-6xl mb-4 opacity-50"></i>
                         <p class="text-sm">Arama yaparak bir film veya dizi açın...</p>
@@ -193,6 +198,37 @@
                         <p class="text-sm text-gray-300 font-medium">Bu buton odadaki herkesin ekranında <span class="text-red-500 font-bold">3'ten geriye</span> sayar. 0 olduğunda herkes kendisi <i class="fa-solid fa-play text-xs mx-1"></i> (Play) tuşuna basmalıdır.</p>
                         <button id="startCountdownBtn" class="bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(220,38,38,0.3)] transform hover:scale-105 active:scale-95 flex items-center gap-2 text-lg">
                             <i class="fa-solid fa-stopwatch"></i> Geri Sayımı Başlat
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Özel Altyazı Yükleme Paneli -->
+                <div id="subtitlesPanel" class="w-full max-w-5xl mx-auto mt-6 bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 backdrop-blur-md">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-closed-captioning text-red-500 text-2xl"></i>
+                        <div class="text-left">
+                            <h3 class="font-bold text-white text-sm">Özel Altyazı Yükle</h3>
+                            <p class="text-xs text-gray-400">Kendi bilgisayarından bir .srt veya .vtt altyazı dosyası ekle.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <!-- Altyazı Gecikme Ayarı -->
+                        <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs">
+                            <span class="text-gray-400">Gecikme (sn):</span>
+                            <input type="number" id="subDelayInput" value="0.0" step="0.5" class="w-12 bg-transparent text-white font-bold text-center focus:outline-none">
+                        </div>
+
+                        <!-- Yükleme Butonları -->
+                        <input type="file" id="subFileInput" accept=".srt,.vtt" class="hidden">
+                        <button id="uploadSubBtn" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all border border-white/10 flex items-center gap-2">
+                            <i class="fa-solid fa-file-upload"></i> Altyazı Seç
+                        </button>
+                        
+                        <!-- Aktif Altyazı Adı ve Kaldırma -->
+                        <span id="activeSubName" class="text-xs text-gray-300 font-medium hidden max-w-[150px] truncate"></span>
+                        <button id="removeSubBtn" class="text-red-500 hover:text-red-400 text-xs font-bold hidden flex items-center gap-1 bg-transparent border-0 cursor-pointer">
+                            <i class="fa-solid fa-trash"></i> Kaldır
                         </button>
                     </div>
                 </div>
@@ -823,6 +859,166 @@
                     }, 1500);
                 }
             }, 1000);
+        });
+
+        // --- ÖZEL ALTYAZI SİSTEMİ (SRT/VTT) ---
+        let subtitles = [];
+        let localPlayhead = 0;
+        let isVideoPlaying = false;
+        let subtitleDelay = 0;
+        let lastTickTime = Date.now();
+
+        const subtitleOverlay = document.getElementById('subtitleOverlay');
+        const subtitleText = document.getElementById('subtitleText');
+        const subFileInput = document.getElementById('subFileInput');
+        const uploadSubBtn = document.getElementById('uploadSubBtn');
+        const subDelayInput = document.getElementById('subDelayInput');
+        const activeSubName = document.getElementById('activeSubName');
+        const removeSubBtn = document.getElementById('removeSubBtn');
+
+        // Socket senkronizasyonu ile altyazı saatini eşleme
+        socket.on('doPlay', (data) => {
+            if (data && typeof data.time === 'number') {
+                localPlayhead = data.time;
+            }
+            isVideoPlaying = true;
+        });
+
+        socket.on('doPause', (data) => {
+            if (data && typeof data.time === 'number') {
+                localPlayhead = data.time;
+            }
+            isVideoPlaying = false;
+        });
+
+        socket.on('doSeek', (data) => {
+            if (data && typeof data.time === 'number') {
+                localPlayhead = data.time;
+            }
+        });
+
+        socket.on('updateVideo', (data) => {
+            if (data) {
+                localPlayhead = data.time || 0;
+                isVideoPlaying = data.isPlaying || false;
+            }
+        });
+
+        // 100ms hassasiyette saat sayacı
+        setInterval(() => {
+            const now = Date.now();
+            const delta = (now - lastTickTime) / 1000;
+            lastTickTime = now;
+
+            if (isVideoPlaying) {
+                localPlayhead += delta;
+            }
+
+            renderSubtitles();
+        }, 100);
+
+        function renderSubtitles() {
+            if (subtitles.length === 0) {
+                subtitleOverlay.classList.add('hidden');
+                return;
+            }
+
+            const adjustedTime = localPlayhead + subtitleDelay;
+            const currentSub = subtitles.find(s => adjustedTime >= s.start && adjustedTime <= s.end);
+
+            if (currentSub) {
+                subtitleText.innerHTML = currentSub.text.replace(/\n/g, '<br>');
+                subtitleOverlay.classList.remove('hidden');
+            } else {
+                subtitleOverlay.classList.add('hidden');
+            }
+        }
+
+        // SRT ve VTT Ayrıştırıcı (Parser)
+        function parseSubtitles(text) {
+            const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const blocks = cleanText.split('\n\n');
+            const parsed = [];
+            
+            const timeRegex = /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/;
+            const timeRegexShort = /(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2})[,.](\d{3})/;
+            
+            blocks.forEach(block => {
+                const lines = block.trim().split('\n');
+                if (lines.length < 2) return;
+                
+                const arrowIdx = lines.findIndex(l => l.includes('-->'));
+                if (arrowIdx === -1) return;
+                
+                const timeLine = lines[arrowIdx];
+                const textStartIdx = arrowIdx + 1;
+                
+                const match = timeLine.match(timeRegex);
+                let start = 0;
+                let end = 0;
+                
+                if (match) {
+                    start = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]) + parseFloat(match[4]) / 1000;
+                    end = parseInt(match[5]) * 3600 + parseInt(match[6]) * 60 + parseInt(match[7]) + parseFloat(match[8]) / 1000;
+                } else {
+                    const matchShort = timeLine.match(timeRegexShort);
+                    if (matchShort) {
+                        start = parseInt(matchShort[1]) * 60 + parseInt(matchShort[2]) + parseFloat(matchShort[3]) / 1000;
+                        end = parseInt(matchShort[4]) * 60 + parseInt(matchShort[5]) + parseFloat(matchShort[6]) / 1000;
+                    } else {
+                        return;
+                    }
+                }
+                
+                const subtitleTextContent = lines.slice(textStartIdx).join('\n').replace(/<[^>]*>/g, '');
+                parsed.push({ start, end, text: subtitleTextContent });
+            });
+            
+            parsed.sort((a, b) => a.start - b.start);
+            return parsed;
+        }
+
+        // Buton ve Dosya Giriş Olayları
+        uploadSubBtn.addEventListener('click', () => subFileInput.click());
+
+        subFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    subtitles = parseSubtitles(event.target.result);
+                    if (subtitles.length > 0) {
+                        activeSubName.innerText = file.name;
+                        activeSubName.classList.remove('hidden');
+                        removeSubBtn.classList.remove('hidden');
+                        uploadSubBtn.innerHTML = '<i class="fa-solid fa-sync"></i> Altyazı Değiştir';
+                        console.log(`[Subtitle] Yüklendi: ${subtitles.length} altyazı bloğu.`);
+                    } else {
+                        alert("Altyazı dosyası ayrıştırılamadı. Lütfen geçerli bir .srt veya .vtt yükleyin.");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Altyazı yüklenirken hata oluştu.");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        removeSubBtn.addEventListener('click', () => {
+            subtitles = [];
+            subFileInput.value = '';
+            activeSubName.innerText = '';
+            activeSubName.classList.add('hidden');
+            removeSubBtn.classList.add('hidden');
+            uploadSubBtn.innerHTML = '<i class="fa-solid fa-file-upload"></i> Altyazı Seç';
+            subtitleOverlay.classList.add('hidden');
+        });
+
+        subDelayInput.addEventListener('input', () => {
+            const val = parseFloat(subDelayInput.value);
+            subtitleDelay = isNaN(val) ? 0 : val;
         });
     </script>
 </body>
