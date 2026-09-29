@@ -175,9 +175,15 @@
                         class="w-full h-full absolute top-0 left-0 transition-opacity duration-500 opacity-0 border-0 hidden"
                         allowfullscreen 
                         allow="autoplay; fullscreen"
-                        sandbox="allow-scripts allow-forms allow-presentation"
                         scrolling="no">
                     </iframe>
+
+                    <!-- Reklam Engelleyici Şeffaf Kalkan Katmanı (Click Shield) -->
+                    <div id="playerClickShield" class="absolute inset-0 z-20 cursor-pointer hidden flex items-center justify-center group select-none">
+                        <div class="w-16 h-16 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white text-2xl opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm shadow-xl">
+                            <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+                        </div>
+                    </div>
 
                     <!-- Instagram Maskeleme Overlay Katmanları -->
                     <div id="instaHeaderOverlay" class="absolute top-0 left-0 right-0 h-[56px] bg-black z-20 pointer-events-none hidden"></div>
@@ -808,6 +814,16 @@
                     moviePlayer.style.setProperty('width', '100%', 'important');
                 }
 
+                // Vidsrc medyasında reklamsız tıklama kalkanını aktif et
+                const playerClickShield = document.getElementById('playerClickShield');
+                if (data.mediaType === 'vidsrc') {
+                    playerClickShield.classList.remove('hidden');
+                    playerClickShield.classList.add('flex');
+                } else {
+                    playerClickShield.classList.add('hidden');
+                    playerClickShield.classList.remove('flex');
+                }
+
                 // Eğer URL aynıysa sadece loading ekranını kaldır (zaten yüklü)
                 if (moviePlayer.src === data.url) {
                     loadingOverlay.classList.add('hidden');
@@ -1021,6 +1037,19 @@
             const val = parseFloat(subDelayInput.value);
             subtitleDelay = isNaN(val) ? 0 : val;
         });
+
+        // Reklam Kalkanı Tıklama Olayı (İframe reklamlarına tıklamayı engeller)
+        const playerClickShield = document.getElementById('playerClickShield');
+        if (playerClickShield) {
+            playerClickShield.addEventListener('click', () => {
+                if (amIAdmin) {
+                    const startCountdownBtn = document.getElementById('startCountdownBtn');
+                    if (startCountdownBtn) startCountdownBtn.click();
+                } else {
+                    appendChatMessage("Sistem", "Videoyu sadece Oda Yöneticisi senkronize edebilir. Ekran tıklaması reklamsız olarak engellendi. 🛡️", true);
+                }
+            });
+        }
     </script>
 </body>
 </html>
