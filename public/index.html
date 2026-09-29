@@ -202,10 +202,15 @@
 
                 <div id="syncControls" class="w-full max-w-5xl mx-auto mt-6 hidden">
                     <div class="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-3 backdrop-blur-md">
-                        <p class="text-sm text-gray-300 font-medium">Bu buton odadaki herkesin ekranında <span class="text-red-500 font-bold">3'ten geriye</span> sayar. 0 olduğunda herkes kendisi <i class="fa-solid fa-play text-xs mx-1"></i> (Play) tuşuna basmalıdır.</p>
-                        <button id="startCountdownBtn" class="bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(220,38,38,0.3)] transform hover:scale-105 active:scale-95 flex items-center gap-2 text-lg">
-                            <i class="fa-solid fa-stopwatch"></i> Geri Sayımı Başlat
-                        </button>
+                        <p class="text-sm text-gray-300 font-medium">Videoyu ilk açılışta oynatmak için Play'e basın. Reklamları engellemek için <span class="text-emerald-400 font-bold">Reklam Kalkanı</span>'nı açabilirsiniz.</p>
+                        <div class="flex items-center gap-3 flex-wrap justify-center">
+                            <button id="startCountdownBtn" class="bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(220,38,38,0.3)] transform hover:scale-105 active:scale-95 flex items-center gap-2 text-lg">
+                                <i class="fa-solid fa-stopwatch"></i> Geri Sayımı Başlat
+                            </button>
+                            <button id="toggleShieldBtn" class="bg-white/10 hover:bg-white/20 text-gray-300 border border-white/10 px-5 py-3 rounded-xl font-bold transition-all flex items-center gap-2 text-sm">
+                                <i class="fa-solid fa-shield-halved text-gray-400"></i> Reklam Kalkanı: KAPALI
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -814,15 +819,9 @@
                     moviePlayer.style.setProperty('width', '100%', 'important');
                 }
 
-                // Vidsrc medyasında reklamsız tıklama kalkanını aktif et
-                const playerClickShield = document.getElementById('playerClickShield');
-                if (data.mediaType === 'vidsrc') {
-                    playerClickShield.classList.remove('hidden');
-                    playerClickShield.classList.add('flex');
-                } else {
-                    playerClickShield.classList.add('hidden');
-                    playerClickShield.classList.remove('flex');
-                }
+                // Video yüklendiğinde kalkan kapalı başlar (Play'e rahat basılması için)
+                isShieldActive = false;
+                updateShieldState();
 
                 // Eğer URL aynıysa sadece loading ekranını kaldır (zaten yüklü)
                 if (moviePlayer.src === data.url) {
@@ -1037,6 +1036,34 @@
             const val = parseFloat(subDelayInput.value);
             subtitleDelay = isNaN(val) ? 0 : val;
         });
+
+        // Reklam Kalkanı Kontrol Mantığı
+        let isShieldActive = false;
+        const toggleShieldBtn = document.getElementById('toggleShieldBtn');
+
+        function updateShieldState() {
+            const playerClickShield = document.getElementById('playerClickShield');
+            if (!playerClickShield || !toggleShieldBtn) return;
+
+            if (isShieldActive) {
+                playerClickShield.classList.remove('hidden');
+                playerClickShield.classList.add('flex');
+                toggleShieldBtn.innerHTML = '<i class="fa-solid fa-shield-halved text-emerald-400"></i> Reklam Kalkanı: AÇIK';
+                toggleShieldBtn.className = 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 px-5 py-3 rounded-xl font-bold transition-all flex items-center gap-2 text-sm shadow-[0_0_15px_rgba(16,185,129,0.2)]';
+            } else {
+                playerClickShield.classList.add('hidden');
+                playerClickShield.classList.remove('flex');
+                toggleShieldBtn.innerHTML = '<i class="fa-solid fa-shield-halved text-gray-400"></i> Reklam Kalkanı: KAPALI';
+                toggleShieldBtn.className = 'bg-white/10 hover:bg-white/20 text-gray-300 border border-white/10 px-5 py-3 rounded-xl font-bold transition-all flex items-center gap-2 text-sm';
+            }
+        }
+
+        if (toggleShieldBtn) {
+            toggleShieldBtn.addEventListener('click', () => {
+                isShieldActive = !isShieldActive;
+                updateShieldState();
+            });
+        }
 
         // Reklam Kalkanı Tıklama Olayı (İframe reklamlarına tıklamayı engeller)
         const playerClickShield = document.getElementById('playerClickShield');
